@@ -146,3 +146,70 @@ export function calculateRecommendedIntake(weight: number, activityLevel: string
     // Round to the nearest 100ml
     return Math.round(baseIntake / 100) * 100;
 }
+
+// Get water data for an entire month
+export async function getMonthWaterData(year: number, month: number): Promise<WaterData[]> {
+    try {
+        // Get all keys from AsyncStorage
+        const keys = await AsyncStorage.getAllKeys();
+
+        // Filter keys that match the water data prefix and the specified year/month
+        const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+        const monthDataKeys = keys.filter(key =>
+            key.startsWith(WATER_DATA_PREFIX) &&
+            key.includes(monthPrefix)
+        );
+
+        // Get all water data entries for the month
+        const monthData = await AsyncStorage.multiGet(monthDataKeys);
+
+        // Parse and sort the data by date
+        const result = monthData
+            .map(([_, value]) => JSON.parse(value as string) as WaterData)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        return result;
+    } catch (error) {
+        console.error('Error getting month water data:', error);
+        return [];
+    }
+}
+
+// Add helper function to get current month and year
+export function getCurrentMonthYear(): { year: number, month: number } {
+    const date = new Date();
+    return {
+        year: date.getFullYear(),
+        month: date.getMonth() + 1 // JavaScript months are 0-indexed
+    };
+}
+
+export async function addWaterFromNotification(amount: number): Promise<boolean> {
+    try {
+        const today = getTodayDateString();
+
+        // Get current water data
+        let data = await getWaterData(today);
+
+        if (!data) {
+            // If no data exists for today, create new data
+            const settings = await getSettings();
+            data = {
+                date: today,
+                intake: 0,
+                goal: settings?.dailyGoal || 2000
+            };
+        }
+
+        // Add water amount
+        data.intake = Math.min(data.intake + amount, data.goal);
+
+        // Save updated data
+        await saveWaterData(data);
+
+        return true;
+    } catch (error) {
+        console.error('Error adding water from notification:', error);
+        return false;
+    }
+}

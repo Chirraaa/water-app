@@ -1,8 +1,8 @@
 // app/(tabs)/index.tsx
 import { LogBox } from 'react-native';
 LogBox.ignoreLogs(['Warning: MeasureElement: Support for defaultProps']);
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, ScrollView, Alert, AppState, AppStateStatus } from 'react-native';
 import {
   Layout,
   Text,
@@ -14,8 +14,11 @@ import {
   Spinner,
   useTheme
 } from '@ui-kitten/components';
-import { getWaterData, saveWaterData, getSettings, getUserProfile, WaterData, getTodayDateString} from '@/utils/storage';
-import { scheduleNotifications } from '@/utils/notifications';
+import { getWaterData, saveWaterData, getSettings, getUserProfile, WaterData, getTodayDateString, addWaterFromNotification } from '@/utils/storage';
+import { scheduleNotifications, createNotificationListener, removeNotificationListener } from '@/utils/notifications';
+import * as Notifications from 'expo-notifications';
+import { NotificationConfirmation } from '@/components/NotificationConfirmation';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 
 const WaterIcon = (props: IconProps) => (
   <Icon {...props} name='droplet-outline' />
@@ -25,9 +28,9 @@ const PlusIcon = (props: IconProps) => (
   <Icon {...props} name='plus-outline' />
 );
 
-
 export default function HomeScreen() {
   const theme = useTheme();
+  const appState = useRef(AppState.currentState);
 
   const [loading, setLoading] = useState(true);
   const [waterIntake, setWaterIntake] = useState(0);
@@ -37,9 +40,38 @@ export default function HomeScreen() {
   const [nextReminderISO, setNextReminderISO] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
 
+  // State for notification confirmation modal
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [notificationAmount, setNotificationAmount] = useState(200);
+
   useEffect(() => {
     loadData();
+
+    // Set up notification listener
+    const notificationListener = createNotificationListener((notification) => {
+      // Show confirmation modal when notification is received
+      if (notification.request.content.data?.type === 'water_reminder') {
+        setNotificationAmount(200); // Default amount
+        setConfirmationVisible(true);
+      }
+    });
+
+    // Subscribe to app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      removeNotificationListener(notificationListener);
+      subscription.remove();
+    };
   }, []);
+
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App has come to the foreground
+      loadData();
+    }
+    appState.current = nextAppState;
+  };
 
   const loadData = async () => {
     try {
@@ -198,6 +230,47 @@ export default function HomeScreen() {
     }
   };
 
+  // Handler for notification confirmation
+  const handleConfirmNotification = async () => {
+    await addWater(notificationAmount);
+    setConfirmationVisible(false);
+  };
+
+  // Handler for notification dismiss
+  const handleDismissNotification = () => {
+    setConfirmationVisible(false);
+    // Schedule a reminder for 15 minutes later
+    scheduleDelayedReminder();
+  };
+
+  // Function to schedule a delayed reminder
+  const scheduleDelayedReminder = async () => {
+    try {
+      const reminderTime = new Date();
+      reminderTime.setMinutes(reminderTime.getMinutes() + 15);
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Reminder: Drink Water! 💧',
+          body: 'You asked us to remind you again. Time to hydrate!',
+          sound: true,
+          data: {
+            type: 'water_reminder',
+            time: reminderTime.toISOString()
+          },
+          categoryIdentifier: 'water_reminder',
+        },
+        trigger: {
+          type: SchedulableTriggerInputTypes.DAILY,
+          hour: reminderTime.getHours(),
+          minute: reminderTime.getMinutes(),
+        },
+      });
+    } catch (error) {
+      console.error('Error scheduling reminder:', error);
+    }
+  };
+
   if (loading) {
     return (
       <Layout style={styles.loadingContainer}>
@@ -268,9 +341,18 @@ export default function HomeScreen() {
           )}
         </Card>
       </ScrollView>
+
+      {/* Notification Confirmation Modal */}
+      <NotificationConfirmation
+        visible={confirmationVisible}
+        onClose={handleDismissNotification}
+        onConfirm={handleConfirmNotification}
+        amount={notificationAmount}
+      />
     </Layout>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

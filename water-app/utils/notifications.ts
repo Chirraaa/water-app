@@ -5,7 +5,7 @@ import * as Device from 'expo-device';
 import { AppSettings, getUserProfile } from './storage';
 import { SchedulableTriggerInputTypes } from 'expo-notifications';
 
-// Configure notifications
+// Configure notifications with a category for action buttons
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
@@ -14,7 +14,7 @@ Notifications.setNotificationHandler({
     }),
 });
 
-// Sample funny reminder messages
+// Expanded list of funny reminder messages
 const reminderMessages = [
     "Hey {name}, your body is 60% water, not coffee! Drink up! 💧",
     "{name}, even cacti need water. And you're not a cactus! 🌵",
@@ -25,7 +25,22 @@ const reminderMessages = [
     "Attention {name}! Your kidneys are sending an SOS. Water needed ASAP! 🚨",
     "Hey {name}, being awesome burns calories, and that requires water! 💪",
     "{name}, your plants get water regularly. Shouldn't you? 🌱",
-    "Water you waiting for, {name}? Time to hydrate! 💧"
+    "Water you waiting for, {name}? Time to hydrate! 💧",
+    "Breaking news: {name}'s water bottle files missing persons report! 📰",
+    "Dear {name}, your future self called to thank you for drinking water now! ⏰",
+    "Plot twist, {name}: You can't run on empty! Hydrate or evaporate! 🏃‍♂️",
+    "Dehydration causes confusion. Wait, who am I texting again? Oh right, {name}! 🤔",
+    "{name}, if you were a car, your water level would be blinking red right now! 🚗",
+    "Hey {name}, remember that time you drank water and felt amazing? Let's do that again! 🎉",
+    "Alert: {name}'s brain is 75% water and currently running on fumes! 🧠",
+    "Roses are red, violets are blue, {name} needs water, this reminder's for you! 🌹",
+    "{name}, your water bottle called. It's feeling ghosted. Don't be that person! 👻",
+    "Did you know that {name} + H2O = Awesomeness? It's science! 🧪",
+    "Hey {name}, that headache might just be your brain's way of requesting water! 🤕",
+    "{name}, hydration is the key to unlocking your superpowers! ⚡",
+    "Warning: {name}'s productivity decreases by 20% when dehydrated! 📊",
+    "Dear {name}, your skin called and is begging for hydration! 💅",
+    "Fun fact: {name} becomes 10% more charming when properly hydrated! ✨"
 ];
 
 // Request permission for notifications
@@ -41,6 +56,10 @@ export async function requestNotificationPermissions() {
             importance: Notifications.AndroidImportance.HIGH,
             vibrationPattern: [0, 250, 250, 250],
             lightColor: '#3366FF',
+            // Enable notification importance for Android
+            // This makes notifications harder to dismiss
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            bypassDnd: true,
         });
     }
 
@@ -52,6 +71,26 @@ export async function requestNotificationPermissions() {
         finalStatus = status;
     }
 
+    // Register notification categories with actions
+    await Notifications.setNotificationCategoryAsync('water_reminder', [
+        {
+            identifier: 'CONFIRM_DRINK',
+            buttonTitle: 'I Drank Water! 💧',
+            options: {
+                isDestructive: false,
+                isAuthenticationRequired: false,
+            },
+        },
+        {
+            identifier: 'REMIND_LATER',
+            buttonTitle: 'Remind Me Later',
+            options: {
+                isDestructive: false,
+                isAuthenticationRequired: false,
+            },
+        },
+    ]);
+
     return finalStatus === 'granted';
 }
 
@@ -59,7 +98,7 @@ export async function requestNotificationPermissions() {
 async function getRandomReminderMessage(): Promise<string> {
     try {
         const userProfile = await getUserProfile();
-        const name = userProfile?.name || "Buddy";
+        const name = userProfile?.name || "Hydration Hero";
         
         const randomIndex = Math.floor(Math.random() * reminderMessages.length);
         return reminderMessages[randomIndex].replace('{name}', name);
@@ -123,7 +162,7 @@ export async function scheduleNotifications(settings: AppSettings) {
             // Get a personalized message
             const message = await getRandomReminderMessage();
 
-            // Schedule the notification
+            // Schedule the notification with category for action buttons
             await Notifications.scheduleNotificationAsync({
                 content: {
                     title: 'Time to drink water! 💧',
@@ -133,6 +172,8 @@ export async function scheduleNotifications(settings: AppSettings) {
                         type: 'water_reminder',
                         time: reminderTime.toISOString()
                     },
+                    categoryIdentifier: 'water_reminder',
+                    sticky: true, // Makes notification persistent on Android
                 },
                 trigger: {
                     type: SchedulableTriggerInputTypes.DAILY,
@@ -158,6 +199,57 @@ export async function cancelAllNotifications() {
         console.error('Error canceling notifications:', error);
         throw error;
     }
+}
+
+// Handle notification response (when user taps action button)
+export async function handleNotificationResponse(response: Notifications.NotificationResponse) {
+    const { actionIdentifier, notification } = response;
+    
+    if (actionIdentifier === 'CONFIRM_DRINK') {
+        // User confirmed they drank water
+        // Update water intake
+        try {
+            const { data } = notification.request.content;
+            // You can emit an event or use a callback to update the water intake
+            console.log('User confirmed drinking water', data);
+            return true;
+        } catch (error) {
+            console.error('Error handling confirmation', error);
+        }
+    } else if (actionIdentifier === 'REMIND_LATER') {
+        // Schedule a reminder for 15 minutes later
+        try {
+            const reminderTime = new Date();
+            reminderTime.setMinutes(reminderTime.getMinutes() + 15);
+            
+            const message = await getRandomReminderMessage();
+            
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: 'Reminder: Drink Water! 💧',
+                    body: message,
+                    sound: true,
+                    data: { 
+                        type: 'water_reminder',
+                        time: reminderTime.toISOString()
+                    },
+                    categoryIdentifier: 'water_reminder',
+                    sticky: true,
+                },
+                trigger: {
+                    type: SchedulableTriggerInputTypes.DAILY,
+                    hour: reminderTime.getHours(),
+                    minute: reminderTime.getMinutes(),
+                },
+            });
+            
+            console.log('Scheduled reminder for 15 minutes later');
+        } catch (error) {
+            console.error('Error scheduling reminder', error);
+        }
+    }
+    
+    return false;
 }
 
 // Create a notification listener
