@@ -1,4 +1,3 @@
-// app/(tabs)/stats.tsx
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Alert, Dimensions } from 'react-native';
 import {
@@ -37,7 +36,6 @@ export default function StatsScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDayData, setSelectedDayData] = useState<WaterData | null>(null);
   
-  // Stats calculations
   const [totalMonthIntake, setTotalMonthIntake] = useState(0);
   const [averageDailyIntake, setAverageDailyIntake] = useState(0);
   const [daysTracked, setDaysTracked] = useState(0);
@@ -54,34 +52,26 @@ export default function StatsScreen() {
       const data = await getMonthWaterData(currentYear, currentMonth);
       setMonthData(data);
       
-      // Calculate statistics
       if (data.length > 0) {
-        // Total intake for the month
         const total = data.reduce((sum, day) => sum + day.intake, 0);
         setTotalMonthIntake(total);
         
-        // Average daily intake
         setAverageDailyIntake(Math.round(total / data.length));
         
-        // Days tracked
         setDaysTracked(data.length);
         
-        // Best day
         const best = data.reduce((max, day) => day.intake > max.intake ? day : max, data[0]);
         setBestDay({date: best.date, intake: best.intake});
         
-        // Goal achievement rate
         const goalDays = data.filter(day => day.intake >= day.goal).length;
         setGoalAchievement(Math.round((goalDays / data.length) * 100));
         
-        // If a date is selected, update the selected day data
         if (selectedDate) {
           const selectedDateStr = selectedDate.toISOString().split('T')[0];
           const dayData = data.find(day => day.date === selectedDateStr);
           setSelectedDayData(dayData || null);
         }
       } else {
-        // Reset stats if no data
         setTotalMonthIntake(0);
         setAverageDailyIntake(0);
         setDaysTracked(0);
@@ -125,35 +115,31 @@ export default function StatsScreen() {
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     
-    // Find data for the selected date
     const dateStr = date.toISOString().split('T')[0];
     const dayData = monthData.find(day => day.date === dateStr);
     setSelectedDayData(dayData || null);
   };
 
-  // Function to calculate the marker color based on intake percentage
   const getDayColor = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     const dayData = monthData.find(day => day.date === dateStr);
     
-    if (!dayData) return theme['color-basic-400']; // No data
+    if (!dayData) return theme['color-basic-400'];
     
     const percentage = dayData.intake / dayData.goal;
     
-    if (percentage >= 1) return theme['color-success-500']; // Met or exceeded goal
-    if (percentage >= 0.75) return theme['color-success-300']; // Close to goal
-    if (percentage >= 0.5) return theme['color-warning-500']; // Half way
-    if (percentage > 0) return theme['color-warning-300']; // Some progress
-    return theme['color-basic-400']; // No progress
+    if (percentage >= 1) return theme['color-success-500'];
+    if (percentage >= 0.75) return theme['color-success-300'];
+    if (percentage >= 0.5) return theme['color-warning-500'];
+    if (percentage > 0) return theme['color-warning-300'];
+    return theme['color-basic-400'];
   };
 
-  // Return a function to render day cell content
   const renderDayCellContent = (info: { date: Date }, style: any) => {
     const date = info.date;
     const dateStr = date.toISOString().split('T')[0];
     const dayData = monthData.find(day => day.date === dateStr);
     
-    // Style for the day cell based on water intake
     const dotColor = getDayColor(date);
     
     return (

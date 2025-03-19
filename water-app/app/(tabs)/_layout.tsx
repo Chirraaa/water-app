@@ -1,4 +1,3 @@
-// app/(tabs)/_layout.tsx
 import React, { useContext } from 'react';
 import { Tabs } from 'expo-router';
 import { Icon } from '@ui-kitten/components';

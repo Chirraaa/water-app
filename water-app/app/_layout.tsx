@@ -9,7 +9,6 @@ import * as Notifications from 'expo-notifications';
 import { handleNotificationResponse } from '@/utils/notifications';
 import { addWaterFromNotification } from '@/utils/storage';
 
-// Create theme context
 export const ThemeContext = createContext({
   theme: 'light',
   toggleTheme: () => { },
@@ -18,7 +17,6 @@ export const ThemeContext = createContext({
 export default function RootLayout() {
   const [theme, setTheme] = useState('light');
 
-  // Load saved theme on app start
   useEffect(() => {
     const loadTheme = async () => {
       try {
@@ -34,15 +32,11 @@ export default function RootLayout() {
     loadTheme();
   }, []);
 
-  // Set up notification response handler
   useEffect(() => {
-    // Listen for notification responses (when user taps action button)
     const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
       const result = await handleNotificationResponse(response);
       
-      // If user confirmed drinking water, update the water intake
       if (result) {
-        // Add default amount of water (200ml)
         await addWaterFromNotification(200);
       }
     });

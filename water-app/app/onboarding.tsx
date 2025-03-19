@@ -1,4 +1,3 @@
-// app/onboarding.tsx
 import React, { useState } from 'react';
 import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
@@ -36,7 +35,6 @@ export default function OnboardingScreen() {
     ];
 
     const handleContinue = async () => {
-        // Validate inputs
         if (!name || !weight || !activityLevel) {
             Alert.alert('Missing Information', 'Please fill in all fields to continue.');
             return;
@@ -51,30 +49,28 @@ export default function OnboardingScreen() {
         setLoading(true);
 
         try {
-            // Calculate recommended water intake
             const recommendedIntake = calculateRecommendedIntake(weightNum, activityLevel);
-
-            // Save user profile
             await saveUserProfile({
                 name,
                 weight: weightNum,
                 activityLevel,
-                recommendedIntake
+                recommendedIntake,
+                level: 0,
+                xp: 0,
+                currentStreak: 0,
+                highestStreak: 0
             });
 
-            // Initialize app settings with the recommended intake
             await saveSettings({
                 dailyGoal: recommendedIntake,
                 notificationsEnabled: true,
-                reminderFrequency: '60', // Default to hourly reminders
+                reminderFrequency: '60',
                 startTime: '8:00',
                 endTime: '22:00'
             });
 
-            // Mark onboarding as completed
             await completeOnboarding();
 
-            // Navigate to the main app
             router.replace('/(tabs)');
         } catch (error) {
             console.error('Error during onboarding:', error);

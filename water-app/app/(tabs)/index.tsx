@@ -1,4 +1,3 @@
-// app/(tabs)/index.tsx
 import { LogBox } from 'react-native';
 LogBox.ignoreLogs(['Warning: MeasureElement: Support for defaultProps']);
 import React, { useState, useEffect, useRef } from 'react';
@@ -46,23 +45,19 @@ export default function HomeScreen() {
   const [highestStreak, setHighestStreak] = useState(0);
 
 
-  // State for notification confirmation modal
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [notificationAmount, setNotificationAmount] = useState(200);
 
   useEffect(() => {
     loadData();
 
-    // Set up notification listener
     const notificationListener = createNotificationListener((notification) => {
-      // Show confirmation modal when notification is received
       if (notification.request.content.data?.type === 'water_reminder') {
-        setNotificationAmount(200); // Default amount
+        setNotificationAmount(200);
         setConfirmationVisible(true);
       }
     });
 
-    // Subscribe to app state changes
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
@@ -73,7 +68,7 @@ export default function HomeScreen() {
 
   const handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-      // App has come to the foreground
+
       loadData();
     }
     appState.current = nextAppState;
@@ -92,19 +87,16 @@ export default function HomeScreen() {
         setHighestStreak(userProfile.highestStreak);
       }
 
-      // Load settings to get daily goal
       const settings = await getSettings();
       if (settings) {
         setDailyGoal(settings.dailyGoal);
       }
 
-      // Load today's water data
       const data = await getWaterData(today);
       if (data) {
         setWaterIntake(data.intake);
         setTodayData(data);
       } else {
-        // Initialize today's data
         const newData: WaterData = {
           date: today,
           intake: 0,
@@ -114,7 +106,6 @@ export default function HomeScreen() {
         await saveWaterData(newData);
       }
 
-      // Calculate next reminder time
       calculateNextReminder(settings?.reminderFrequency, settings?.startTime, settings?.endTime);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -124,7 +115,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Function to calculate the next reminder time
   const calculateNextReminder = (frequency?: string, startTime?: string, endTime?: string) => {
     if (!frequency || !startTime || !endTime) {
       setNextReminderTime(null);
@@ -140,13 +130,11 @@ export default function HomeScreen() {
       const [startHour, startMinute] = startTime.split(':').map(Number);
       const [endHour, endMinute] = endTime.split(':').map(Number);
 
-      // Check if current time is within the active hours
       const currentTimeInMinutes = currentHour * 60 + currentMinute;
       const startTimeInMinutes = startHour * 60 + startMinute;
       const endTimeInMinutes = endHour * 60 + endMinute;
 
       if (currentTimeInMinutes < startTimeInMinutes) {
-        // If before start time, next reminder is at start time
         setNextReminderTime(startTime);
 
         const nextReminder = new Date();
@@ -156,7 +144,6 @@ export default function HomeScreen() {
       }
 
       if (currentTimeInMinutes > endTimeInMinutes) {
-        // If after end time, next reminder is tomorrow at start time
         setNextReminderTime(`${startTime} (tomorrow)`);
 
         const nextReminder = new Date();
@@ -166,7 +153,6 @@ export default function HomeScreen() {
         return;
       }
 
-      // If within active hours, calculate next reminder based on frequency
       const frequencyMin = parseInt(frequency);
       if (isNaN(frequencyMin)) {
         setNextReminderTime(null);
@@ -174,13 +160,11 @@ export default function HomeScreen() {
         return;
       }
 
-      // Calculate minutes until next reminder
       const minutesSinceStart = currentTimeInMinutes - startTimeInMinutes;
       const remindersSoFar = Math.floor(minutesSinceStart / frequencyMin);
       const nextReminderMinutes = startTimeInMinutes + (remindersSoFar + 1) * frequencyMin;
 
       if (nextReminderMinutes > endTimeInMinutes) {
-        // If next reminder would be after end time, next reminder is tomorrow
         setNextReminderTime(`${startTime} (tomorrow)`);
 
         const nextReminder = new Date();
@@ -190,12 +174,10 @@ export default function HomeScreen() {
         return;
       }
 
-      // Format the next reminder time
       const nextHour = Math.floor(nextReminderMinutes / 60);
       const nextMinute = nextReminderMinutes % 60;
       const nextTimeStr = `${nextHour.toString().padStart(2, '0')}:${nextMinute.toString().padStart(2, '0')}`;
 
-      // Calculate time remaining
       const minutesRemaining = nextReminderMinutes - currentTimeInMinutes;
       let timeRemainingStr;
       if (minutesRemaining < 60) {
@@ -218,7 +200,6 @@ export default function HomeScreen() {
     }
   };
 
-  // Function to add water
   const addWater = async (amount: number) => {
     try {
       const newIntake = Math.min(waterIntake + amount, dailyGoal);
@@ -228,7 +209,7 @@ export default function HomeScreen() {
         const updatedData: WaterData = { ...todayData, intake: newIntake };
         setTodayData(updatedData);
         await saveWaterData(updatedData);
-        await updateGamification(newIntake, dailyGoal); // Update XP and level
+        await updateGamification(newIntake, dailyGoal);
         const updatedProfile = await getUserProfile();
         if (updatedProfile) {
           setLevel(updatedProfile.level);
@@ -236,7 +217,7 @@ export default function HomeScreen() {
           setCurrentStreak(updatedProfile.currentStreak);
           setHighestStreak(updatedProfile.highestStreak);
           const settings = await getSettings();
-          if (settings) setDailyGoal(settings.dailyGoal); // Reflect new goal
+          if (settings) setDailyGoal(settings.dailyGoal);
         }
       }
     } catch (error) {
@@ -252,20 +233,16 @@ export default function HomeScreen() {
     return "Water Novice";
   };
 
-  // Handler for notification confirmation
   const handleConfirmNotification = async () => {
     await addWater(notificationAmount);
     setConfirmationVisible(false);
   };
 
-  // Handler for notification dismiss
   const handleDismissNotification = () => {
     setConfirmationVisible(false);
-    // Schedule a reminder for 15 minutes later
     scheduleDelayedReminder();
   };
 
-  // Function to schedule a delayed reminder
   const scheduleDelayedReminder = async () => {
     try {
       const reminderTime = new Date();

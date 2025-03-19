@@ -25,23 +25,19 @@ const ClockIcon = (props: IconProps) => (
 );
 
 export default function SettingsScreen() {
-  // Theme settings
   const themeContext = useContext(ThemeContext);
 
-  // User profile settings
   const [weight, setWeight] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
   const [selectedActivityIndex, setSelectedActivityIndex] = useState<IndexPath | undefined>();
   const [userName, setUserName] = useState('');
 
-  // Water and notification settings
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [dailyGoal, setDailyGoal] = useState('2000');
   const [reminderFrequency, setReminderFrequency] = useState('60');
   const [startTime, setStartTime] = useState('8:00');
   const [endTime, setEndTime] = useState('22:00');
 
-  // Time picker state
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [startTimeDate, setStartTimeDate] = useState(new Date());
@@ -63,7 +59,6 @@ export default function SettingsScreen() {
     loadAllSettings();
   }, []);
 
-  // Convert time string to Date object
   const timeStringToDate = (timeString: string): Date => {
     const [hours, minutes] = timeString.split(':').map(Number);
     const date = new Date();
@@ -72,28 +67,24 @@ export default function SettingsScreen() {
     return date;
   };
 
-  // Convert Date object to time string
   const dateToTimeString = (date: Date): string => {
     return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
   };
 
   const loadAllSettings = async () => {
     try {
-      // Load user profile
       const profile = await getUserProfile();
       if (profile) {
         setWeight(profile.weight.toString());
         setActivityLevel(profile.activityLevel);
         setUserName(profile.name || '');
 
-        // Find the corresponding index for the activity level
         const activityIndex = activityOptions.findIndex(option => option === profile.activityLevel);
         if (activityIndex !== -1) {
           setSelectedActivityIndex(new IndexPath(activityIndex));
         }
       }
 
-      // Load app settings
       const settings = await getSettings();
       if (settings) {
         setNotificationsEnabled(settings.notificationsEnabled);
@@ -102,7 +93,6 @@ export default function SettingsScreen() {
         setStartTime(settings.startTime || '8:00');
         setEndTime(settings.endTime || '22:00');
 
-        // Set time picker dates
         setStartTimeDate(timeStringToDate(settings.startTime || '8:00'));
         setEndTimeDate(timeStringToDate(settings.endTime || '22:00'));
       }
@@ -128,9 +118,7 @@ export default function SettingsScreen() {
     setEndTime(dateToTimeString(currentDate));
   };
 
-// app/(tabs)/settings.tsx
 const handleSave = async () => {
-  // Validate inputs
   if (!weight || !activityLevel) {
     Alert.alert('Missing Information', 'Please fill in all required fields.');
     return;
@@ -145,13 +133,10 @@ const handleSave = async () => {
   try {
     setSaving(true);
 
-    // Calculate recommended intake based on current values
     const recommendedIntake = calculateRecommendedIntake(weightNum, activityLevel);
 
-    // Get existing profile to preserve gamification data
     const existingProfile = await getUserProfile();
 
-    // Update user profile with gamification fields preserved
     await saveUserProfile({
       name: userName,
       weight: weightNum,
@@ -163,10 +148,9 @@ const handleSave = async () => {
       highestStreak: existingProfile?.highestStreak || 0,
     });
 
-    // Ask if user wants to update daily goal (considering level adjustment)
     let goalValue = parseInt(dailyGoal);
     if (isNaN(goalValue) || goalValue <= 0) {
-      goalValue = recommendedIntake; // Use recommended as fallback
+      goalValue = recommendedIntake;
     }
 
     const levelAdjustedGoal = recommendedIntake + ((existingProfile?.level || 1) - 1) * 50;
@@ -189,11 +173,10 @@ const handleSave = async () => {
     });
 
     if (useRecommended) {
-      goalValue = levelAdjustedGoal; // Use level-adjusted goal if chosen
+      goalValue = levelAdjustedGoal;
       setDailyGoal(goalValue.toString());
     }
 
-    // Save all app settings
     const settingsToSave = {
       dailyGoal: goalValue,
       notificationsEnabled,
@@ -204,7 +187,6 @@ const handleSave = async () => {
 
     await saveSettings(settingsToSave);
 
-    // Handle notifications based on user preference
     if (notificationsEnabled) {
       try {
         await scheduleNotifications(settingsToSave);

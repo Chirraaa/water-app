@@ -10,7 +10,6 @@ export default function Index() {
   const [hasCompleted, setHasCompleted] = useState(false);
 
   useEffect(() => {
-    // Check if onboarding has been completed
     const checkOnboarding = async () => {
       try {
         const completed = await isOnboardingCompleted();
@@ -25,7 +24,6 @@ export default function Index() {
     checkOnboarding();
   }, []);
 
-  // Show loading spinner while checking status
   if (loading) {
     return (
       <Layout style={styles.container}>
@@ -34,7 +32,6 @@ export default function Index() {
     );
   }
 
-  // Redirect based on onboarding status
   if (hasCompleted) {
     return <Redirect href="/(tabs)" />;
   } else {
