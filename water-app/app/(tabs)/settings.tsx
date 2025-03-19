@@ -128,96 +128,106 @@ export default function SettingsScreen() {
     setEndTime(dateToTimeString(currentDate));
   };
 
-  const handleSave = async () => {
-    // Validate inputs
-    if (!weight || !activityLevel) {
-      Alert.alert('Missing Information', 'Please fill in all required fields.');
-      return;
+// app/(tabs)/settings.tsx
+const handleSave = async () => {
+  // Validate inputs
+  if (!weight || !activityLevel) {
+    Alert.alert('Missing Information', 'Please fill in all required fields.');
+    return;
+  }
+
+  const weightNum = parseFloat(weight);
+  if (isNaN(weightNum) || weightNum <= 0) {
+    Alert.alert('Invalid Weight', 'Please enter a valid weight.');
+    return;
+  }
+
+  try {
+    setSaving(true);
+
+    // Calculate recommended intake based on current values
+    const recommendedIntake = calculateRecommendedIntake(weightNum, activityLevel);
+
+    // Get existing profile to preserve gamification data
+    const existingProfile = await getUserProfile();
+
+    // Update user profile with gamification fields preserved
+    await saveUserProfile({
+      name: userName,
+      weight: weightNum,
+      activityLevel,
+      recommendedIntake,
+      level: existingProfile?.level || 1,
+      xp: existingProfile?.xp || 0,
+      currentStreak: existingProfile?. currentStreak || 0,
+      highestStreak: existingProfile?.highestStreak || 0,
+    });
+
+    // Ask if user wants to update daily goal (considering level adjustment)
+    let goalValue = parseInt(dailyGoal);
+    if (isNaN(goalValue) || goalValue <= 0) {
+      goalValue = recommendedIntake; // Use recommended as fallback
     }
 
-    const weightNum = parseFloat(weight);
-    if (isNaN(weightNum) || weightNum <= 0) {
-      Alert.alert('Invalid Weight', 'Please enter a valid weight.');
-      return;
+    const levelAdjustedGoal = recommendedIntake + ((existingProfile?.level || 1) - 1) * 50;
+    const useRecommended = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Update Water Goal',
+        `Based on your profile, we recommend ${recommendedIntake}ml daily. Your level (${existingProfile?.level || 1}) adjusts this to ${levelAdjustedGoal}ml. Would you like to update your goal?`,
+        [
+          {
+            text: 'Keep Current',
+            onPress: () => resolve(false),
+            style: 'cancel',
+          },
+          {
+            text: 'Use Recommended',
+            onPress: () => resolve(true),
+          },
+        ]
+      );
+    });
+
+    if (useRecommended) {
+      goalValue = levelAdjustedGoal; // Use level-adjusted goal if chosen
+      setDailyGoal(goalValue.toString());
     }
 
-    try {
-      setSaving(true);
+    // Save all app settings
+    const settingsToSave = {
+      dailyGoal: goalValue,
+      notificationsEnabled,
+      reminderFrequency,
+      startTime,
+      endTime,
+    };
 
-      // Calculate recommended intake based on current values
-      const recommendedIntake = calculateRecommendedIntake(weightNum, activityLevel);
+    await saveSettings(settingsToSave);
 
-      // Update user profile
-      await saveUserProfile({
-        name: userName,
-        weight: weightNum,
-        activityLevel,
-        recommendedIntake
-      });
-      // Ask if user wants to update daily goal to recommended value
-      let goalValue = parseInt(dailyGoal);
-      if (isNaN(goalValue) || goalValue <= 0) {
-        goalValue = recommendedIntake; // Use recommended as fallback
+    // Handle notifications based on user preference
+    if (notificationsEnabled) {
+      try {
+        await scheduleNotifications(settingsToSave);
+      } catch (error) {
+        console.error('Failed to schedule notifications:', error);
+        Alert.alert('Warning', 'Settings saved but notification scheduling failed.');
       }
-
-      const useRecommended = await new Promise<boolean>((resolve) => {
-        Alert.alert(
-          'Update Water Goal',
-          `Based on your profile, we recommend ${recommendedIntake}ml of water daily. Would you like to update your goal?`,
-          [
-            {
-              text: 'Keep Current',
-              onPress: () => resolve(false),
-              style: 'cancel',
-            },
-            {
-              text: 'Use Recommended',
-              onPress: () => resolve(true),
-            },
-          ]
-        );
-      });
-
-      if (useRecommended) {
-        goalValue = recommendedIntake;
-        setDailyGoal(goalValue.toString());
+    } else {
+      try {
+        await cancelAllNotifications();
+      } catch (error) {
+        console.error('Failed to cancel notifications:', error);
       }
-
-      // Save all app settings
-      const settingsToSave = {
-        dailyGoal: goalValue,
-        notificationsEnabled,
-        reminderFrequency,
-        startTime,
-        endTime
-      };
-
-      await saveSettings(settingsToSave);
-
-      // Handle notifications based on user preference
-      if (notificationsEnabled) {
-        try {
-          await scheduleNotifications(settingsToSave);
-        } catch (error) {
-          console.error('Failed to schedule notifications:', error);
-          Alert.alert('Warning', 'Settings saved but notification scheduling failed.');
-        }
-      } else {
-        try {
-          await cancelAllNotifications();
-        } catch (error) {
-          console.error('Failed to cancel notifications:', error);
-        }
-      }
-
-      Alert.alert('Success', 'Your settings have been saved.');
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      Alert.alert('Error', 'Failed to save your settings. Please try again.');
-    } finally {
-      setSaving(false);
     }
-  };
+
+    Alert.alert('Success', 'Your settings have been saved.');
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    Alert.alert('Error', 'Failed to save your settings. Please try again.');
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading) {
     return (

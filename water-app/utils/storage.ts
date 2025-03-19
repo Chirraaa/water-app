@@ -7,6 +7,10 @@ export interface UserProfile {
     weight: number;
     activityLevel: string;
     recommendedIntake: number;
+    level: number;           // Current level (starts at 1)
+    xp: number;             // Total experience points
+    currentStreak: number;  // Consecutive days meeting goal
+    highestStreak: number;  // Best streak ever
 }
 
 export interface WaterData {
@@ -53,7 +57,16 @@ export async function completeOnboarding(): Promise<void> {
 // Save user profile
 export async function saveUserProfile(profile: UserProfile): Promise<void> {
     try {
-        await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+        const existingProfile = await getUserProfile();
+        const updatedProfile = {
+            ...existingProfile,
+            ...profile,
+            level: profile.level ?? 1,
+            xp: profile.xp ?? 0,
+            currentStreak: profile.currentStreak ?? 0,
+            highestStreak: profile.highestStreak ?? 0,
+        };
+        await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(updatedProfile));
     } catch (error) {
         console.error('Error saving user profile:', error);
         throw error;
@@ -212,4 +225,50 @@ export async function addWaterFromNotification(amount: number): Promise<boolean>
         console.error('Error adding water from notification:', error);
         return false;
     }
+}
+
+// Helper to update XP and level
+export async function updateGamification(dailyIntake: number, dailyGoal: number): Promise<void> {
+    const profile = await getUserProfile();
+    if (!profile) return;
+
+    // Calculate XP: 10 XP per 100ml, +50 XP bonus for meeting goal
+    const intakeXP = Math.floor(dailyIntake / 100) * 10;
+    const goalBonus = dailyIntake >= dailyGoal ? 50 : 0;
+    const newXP = profile.xp + intakeXP + goalBonus;
+
+    // Update streak
+    const metGoalYesterday = await checkYesterdayGoalMet();
+    const newStreak = (dailyIntake >= dailyGoal) 
+        ? (metGoalYesterday ? profile.currentStreak + 1 : 1)
+        : 0;
+
+    // Level up: 500 XP per level
+    const newLevel = Math.max(1, Math.floor(newXP / 500) + 1);
+
+    // Adjust goal based on level (e.g., +50ml per level after level 1)
+    const adjustedGoal = profile.recommendedIntake + (newLevel - 1) * 50;
+
+    await saveUserProfile({
+        ...profile,
+        xp: newXP,
+        level: newLevel,
+        currentStreak: newStreak,
+        highestStreak: Math.max(profile.highestStreak, newStreak),
+    });
+
+    // Update settings with new goal
+    const settings = await getSettings();
+    if (settings) {
+        await saveSettings({ ...settings, dailyGoal: adjustedGoal });
+    }
+}
+
+// Check if yesterday's goal was met
+async function checkYesterdayGoalMet(): Promise<boolean> {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split('T')[0];
+    const data = await getWaterData(dateStr);
+    return data ? data.intake >= data.goal : false;
 }

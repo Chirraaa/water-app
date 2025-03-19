@@ -14,7 +14,7 @@ import {
   Spinner,
   useTheme
 } from '@ui-kitten/components';
-import { getWaterData, saveWaterData, getSettings, getUserProfile, WaterData, getTodayDateString, addWaterFromNotification } from '@/utils/storage';
+import { getWaterData, saveWaterData, getSettings, getUserProfile, WaterData, getTodayDateString, addWaterFromNotification, updateGamification } from '@/utils/storage';
 import { scheduleNotifications, createNotificationListener, removeNotificationListener } from '@/utils/notifications';
 import * as Notifications from 'expo-notifications';
 import { NotificationConfirmation } from '@/components/NotificationConfirmation';
@@ -39,6 +39,12 @@ export default function HomeScreen() {
   const [nextReminderTime, setNextReminderTime] = useState<string | null>(null);
   const [nextReminderISO, setNextReminderISO] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
+
+  const [level, setLevel] = useState(1);
+  const [xp, setXP] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [highestStreak, setHighestStreak] = useState(0);
+
 
   // State for notification confirmation modal
   const [confirmationVisible, setConfirmationVisible] = useState(false);
@@ -77,11 +83,13 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       const today = getTodayDateString();
-
-      // Load user profile to get name
       const userProfile = await getUserProfile();
       if (userProfile) {
         setUserName(userProfile.name || '');
+        setLevel(userProfile.level);
+        setXP(userProfile.xp);
+        setCurrentStreak(userProfile.currentStreak);
+        setHighestStreak(userProfile.highestStreak);
       }
 
       // Load settings to get daily goal
@@ -217,17 +225,31 @@ export default function HomeScreen() {
       setWaterIntake(newIntake);
 
       if (todayData) {
-        const updatedData: WaterData = {
-          ...todayData,
-          intake: newIntake
-        };
+        const updatedData: WaterData = { ...todayData, intake: newIntake };
         setTodayData(updatedData);
         await saveWaterData(updatedData);
+        await updateGamification(newIntake, dailyGoal); // Update XP and level
+        const updatedProfile = await getUserProfile();
+        if (updatedProfile) {
+          setLevel(updatedProfile.level);
+          setXP(updatedProfile.xp);
+          setCurrentStreak(updatedProfile.currentStreak);
+          setHighestStreak(updatedProfile.highestStreak);
+          const settings = await getSettings();
+          if (settings) setDailyGoal(settings.dailyGoal); // Reflect new goal
+        }
       }
     } catch (error) {
       console.error('Error adding water:', error);
-      Alert.alert('Error', 'Failed to update your water intake. Please try again.');
     }
+  };
+
+  const getRankTitle = (lvl: number) => {
+    if (lvl >= 20) return "Aqua Legend";
+    if (lvl >= 15) return "Hydration Master";
+    if (lvl >= 10) return "Water Warrior";
+    if (lvl >= 5) return "Hydro Hero";
+    return "Water Novice";
   };
 
   // Handler for notification confirmation
@@ -285,6 +307,20 @@ export default function HomeScreen() {
         <Text category='h1' style={styles.title}>
           {userName ? `${userName}'s Water Tracker` : 'Water Reminder'}
         </Text>
+
+        {/* Gamification Card */}
+        <Card style={styles.card}>
+          <Text category='h6'>Your Journey</Text>
+          <Text category='s1'>Rank: {getRankTitle(level)}</Text>
+          <Text>Level: {level}</Text>
+          <Text>XP: {xp} / {(level) * 500}</Text>
+          <ProgressBar
+            style={styles.progressBar}
+            progress={(xp % 500) / 500}
+          />
+          <Text>Current Streak: {currentStreak} days</Text>
+          <Text>Highest Streak: {highestStreak} days</Text>
+        </Card>
 
         {/* Progress Card */}
         <Card style={styles.card}>
